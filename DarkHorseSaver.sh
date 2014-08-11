@@ -65,8 +65,8 @@ while getopts ":o:c:g:" opt; do
 	esac
 done
 
-if [ ! -n "$dir" ]; then echo "Please specify a directory with -o";exit 1;fi
-if [ ! -n "$cookieFile" -a -e ~/cookies.txt ]; then
+if [ -z "$dir" ]; then echo "Please specify a directory with -o";exit 1;fi
+if [ -z "$cookieFile" -a -e ~/cookies.txt ]; then
 	cookieFile=~/cookies.txt;echo "Note: No cookie.txt specified, using $HOME/cookies.txt"
 else
 	echo "No cookie file specified, and $HOME/cookies.txt does not exist";exit 1
@@ -75,7 +75,7 @@ if [ ! -e "$dir" ]; then mkdir $dir;fi
 cd $dir
 
 wget -q --load-cookies "$cookieFile" 'https://digital.darkhorse.com/api/v/books/' -O index.html||(echo "Error downloading, check network and presence of cookies.txt in working directory and try again.";exit 1)
-if [ ! -n "$input" ]; then
+if [ -z "$input" ]; then
 	printComics
 	input=$(read input;eval echo $input)
 fi
