@@ -17,29 +17,24 @@ function printComics(){
 
 function getComic(){
 	IFS=$'\n'
-	titleNum=0
 	currentIndex=$(sed 's/},{"viewport/\nviewport/g' index.html|sed "$1q;d")
 	title=$(getKey "$currentIndex" "title")
 	echo "Getting $title"
-	mkdir -p comics/$title
-	cd comics/$title
-	echo "Getting manifest"
-	wget -q --timeout 2 -t 5 --load-cookies $cookieFile $(getKey "$currentIndex" "manifest") -O manifest.json||(echo "Manifest forbidden, check cookies file (try accessing the manifest at $(getKey "$currentIndex" "manifest") then updating your cookies.txt file).";exit 1)
-
-	baseURL=$(getKey $(cat manifest.json) "base_url");
-	URLs=$(getKey $(cat manifest.json) "src_image");
-	echo "Getting $(wc -l < <(echo "$URLs")) images:"
+	mkdir -p temp/$title
+	cd temp/$title
+	uuid=$(getKey $currentIndex "book_uuid");
+	echo "Getting book.tar"
+	wget -c --load-cookies "$cookieFile" "https://digital.darkhorse.com/api/v5/book/$uuid" -O book.tar --progress=bar:force 2>&1 | tail -f -n +10
+	tar xf book.tar||exit
 	x=0
-	for i in $URLs
+	for image in $(grep -oP 'src_image": "\K[^"]*' manifest.json)
 	do
-			echo -n "$x."
-			wget -q --timeout 2 -t 5 --load-cookies $cookieFile $baseURL/$i -O $(printf "%03d" $x).jpg --append-output=imageLog.txt&
-			x=$(($x+1))
+	    mv $image $(printf "%03d" $x).jpg
+	    x=$(($x+1))
 	done
-	echo ""
-	wait
 	echo "Making cbz"
-	zip ../$title.cbz *.jpg>/dev/null
+	zip comics/$title.cbz *.jpg>/dev/null
+	rm book.tar
 	cd ../..
 }
 
@@ -71,10 +66,10 @@ if [ -z "$cookieFile" -a -e ~/cookies.txt ]; then
 else
 	echo "No cookie file specified, and $HOME/cookies.txt does not exist";exit 1
 fi
-if [ ! -e "$dir" ]; then mkdir $dir;fi
+if [ ! -e "$dir/comics" ]; then mkdir -p $dir/comics;fi
 cd $dir
 
-wget -q --load-cookies "$cookieFile" 'https://digital.darkhorse.com/api/v/books/' -O index.html||(echo "Error downloading, check network and presence of cookies.txt in working directory and try again.";exit 1)
+wget --load-cookies "$cookieFile" 'https://digital.darkhorse.com/api/v/books/' -O index.html --progress=bar:force 2>&1 | tail -f -n +6||(echo "Error downloading, check network and presence of cookies.txt in working directory and try again.";exit 1)
 if [ -z "$input" ]; then
 	printComics
 	input=$(read input;eval echo $input)
