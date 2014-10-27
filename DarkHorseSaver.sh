@@ -16,22 +16,26 @@ function printComics(){
 }
 
 function getComic(){
+	echo "Getting $title"
 	IFS=$'\n'
 	currentIndex=$(sed 's/},{"viewport/\nviewport/g' index.html|sed "$1q;d")
 	title=$(getKey "$currentIndex" "title")
-	echo "Getting $title"
 	mkdir -p temp/$title
 	cd temp/$title
 	uuid=$(getKey $currentIndex "book_uuid");
+
 	echo "Getting book.tar"
 	wget -c --load-cookies "$cookieFile" "https://digital.darkhorse.com/api/v5/book/$uuid" -O book.tar --progress=bar:force 2>&1 | tail -f -n +10
 	tar xf book.tar||exit
+
+	echo "sorting images"
 	x=0
 	for image in $(grep -oP 'src_image": "\K[^"]*' manifest.json)
 	do
 	    mv $image $(printf "%03d" $x).jpg
 	    x=$(($x+1))
 	done
+
 	echo "Making cbz"
 	zip comics/$title.cbz *.jpg>/dev/null
 	rm book.tar
