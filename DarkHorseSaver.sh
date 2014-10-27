@@ -37,7 +37,7 @@ function getComic(){
 	done
 
 	echo "Making cbz"
-	zip comics/$title.cbz *.jpg>/dev/null
+	zip ../../comics/$title.cbz *.jpg manifest.json>/dev/null
 	rm book.tar
 	cd ../..
 }
