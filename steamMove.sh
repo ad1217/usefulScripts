@@ -1,0 +1,83 @@
+#!/bin/bash
+
+IFS=$'\n'
+basedir="$HOME/.local/share/Steam"
+
+
+case "$1" in
+	"-d"|"--directory") basedir="$2"; shift 2;;
+	"-h"|"--help") echo 'Usage: steamMove.sh [OPTIONS] [src num] [dest num]
+  -d --directory	Set the base directory
+  -h --help	This help text'|column -ts '	'; exit;;
+esac
+
+dirs="$basedir
+$(grep -oP "[	 ]\"[0-9]+\"[^\"]*\"\K[^\"]*" "$basedir/steamapps/libraryfolders.vdf" | sed 's/\\\\/\//g;s/Z://')"
+
+if [ -z $1 -a -z $2 ]
+then
+	echo "Libraries:
+$(nl -nln <<< "$dirs")"
+
+	read -p "Select a source library:
+> " srcLibraryNum
+
+	read -p "Select a destination library:
+> " destLibraryNum
+
+	if [ "$srcLibraryNum" = "$destLibraryNum" ];then echo "Source and destination are the same!";exit;fi
+else
+	srcLibraryNum=$1
+	destLibraryNum=$2
+fi
+
+srcLibrary=$( sed "${srcLibraryNum}q;d" <<< "$dirs")
+destLibrary=$( sed "${destLibraryNum}q;d" <<< "$dirs")
+
+if [ -z "$srcLibrary" -o ! -d "$srcLibrary" ];then echo "Source library $srcLibrary is not availible or is null";exit;fi
+if [ -z "$destLibrary" -o ! -d "$destLibrary" ];then echo "Destination library $destLibrary is not availible or is null";exit;fi
+
+gameNum=1
+echo "Library $srcLibrary:"
+games="$(for jj in "$srcLibrary"/steamapps/appmanifest_*
+		do
+			echo -n "$gameNum	"
+			grep -m1 -oP 'name"[	]*"\K[^"]*' "$jj" |tr -d '\n'
+			echo -n "	"
+			grep -oP 'installdir"[	]*"\K[^"]*' "$jj" |tr -d '\n'
+			echo  "	$jj"
+			gameNum=$(($gameNum+1))
+		done)"
+echo
+
+echo "$(tput bold)Num		Game	   Directory
+$(tput sgr0)$(awk -F "	" '{print $1,"\t",$2,"\t",$3}' <<< "$games")" |column -ts '	'
+read -p "Enter the number(s) or part of the name of a game to move:
+> " input
+
+case $input in  #Still rather ugly
+	*[!0-9\ ]*) input="$(awk "/$input/ {print FNR}" <<< "$games")" && echo "Interpreting as search, $( [ -n "$input" ] && wc -l <<<"$input" || echo -n 0) matches";;&
+	*[\ ]*) input="$(tr ' ' '\n' <<< "$input")" ;;
+	*)  ;;
+esac
+
+for ii in $input
+do
+	echo "Moving \"$(awk -F "	" "NR==$ii {print \$2}" <<< "$games")\""
+	read -p "Move, copy or skip? [m/c/*]: " option
+	case $option in
+		M|m)
+			echo "  Directory \"$(awk -F "	" "NR==$ii {print \$3}" <<< "$games")\""
+			rsync -rP "$srcLibrary"/steamapps/common/"$(awk -F "	" "NR==$ii {print \$3}" <<< "$games")" "$destLibrary"/steamapps/common
+			rm -rf "$srcLibrary"/steamapps/common/"$(awk -F "	" "NR==$ii {print \$3}" <<< "$games")"
+			echo "  Manifest \"$(awk -F "	" "NR==$ii {print \$4}" <<< "$games")\""
+			mv "$(awk -F "	" "NR==$ii {print \$4}" <<< "$games")" "$destLibrary"/steamapps
+			;;
+		C|c)
+			echo "  Directory \"$(awk -F "	" "NR==$ii {print \$3}" <<< "$games")\""
+			rsync -rP "$srcLibrary"/steamapps/common/"$(awk -F "	" "NR==$ii {print \$3}" <<< "$games")" "$destLibrary"/steamapps/common
+			echo "  Manifest \"$(awk -F "	" "NR==$ii {print \$4}" <<< "$games")\""
+			cp "$(awk -F "	" "NR==$ii {print \$4}" <<< "$games")" "$destLibrary"/steamapps
+			;;
+	esac
+done
