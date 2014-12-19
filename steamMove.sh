@@ -14,31 +14,50 @@ esac
 dirs="$basedir
 $(grep -oP "[	 ]\"[0-9]+\"[^\"]*\"\K[^\"]*" "$basedir/steamapps/libraryfolders.vdf" | sed 's/\\\\/\//g;s/Z://')"
 
-if [ -z $1 -a -z $2 ]
-then
-	echo "Libraries:
+echo "Detected Libraries:
 $(nl -nln <<< "$dirs")"
 
-	read -p "Select a source library:
+case $1 in
+	'')
+		read -p "Select a source library:
 > " srcLibraryNum
+		
+		srcLibrary=$( sed "${srcLibraryNum}q;d" <<< "$dirs")
+		;;
+	*[!0-9]*)
+		srcLibrary="$1"
+		;;
+	*)
+		srcLibraryNum=$1
+		srcLibrary=$( sed "${srcLibraryNum}q;d" <<< "$dirs")
+		;;
+esac
 
-	read -p "Select a destination library:
+case $2 in
+	'')
+		read -p "Select a destination library:
 > " destLibraryNum
+		destLibrary=$( sed "${destLibraryNum}q;d" <<< "$dirs")
+		;;
+	*[!0-9]*)
+		destLibrary="$2"
+		;;
+	*)
+		destLibraryNum=$2
+		destLibrary=$( sed "${destLibraryNum}q;d" <<< "$dirs")
+		;;
+esac
+echo "
+Source Library: $srcLibrary
+  Dest Library: $destLibrary
+"
 
-	if [ "$srcLibraryNum" = "$destLibraryNum" ];then echo "Source and destination are the same!";exit;fi
-else
-	srcLibraryNum=$1
-	destLibraryNum=$2
-fi
-
-srcLibrary=$( sed "${srcLibraryNum}q;d" <<< "$dirs")
-destLibrary=$( sed "${destLibraryNum}q;d" <<< "$dirs")
-
+if [ "$srcLibraryNum" = "$destLibraryNum" ];then echo "Source and destination are the same!";exit;fi
 if [ -z "$srcLibrary" -o ! -d "$srcLibrary" ];then echo "Source library $srcLibrary is not availible or is null";exit;fi
 if [ -z "$destLibrary" -o ! -d "$destLibrary" ];then echo "Destination library $destLibrary is not availible or is null";exit;fi
 
 gameNum=1
-echo "Library $srcLibrary:"
+echo "Games in $srcLibrary:"
 games="$(for jj in "$srcLibrary"/steamapps/appmanifest_*
 		do
 			echo -n "$gameNum	"
